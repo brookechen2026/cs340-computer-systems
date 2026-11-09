@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Client view</title>
+<style>
+  code,input { font-size: 1rem; }
+  code { border: thin solid rgba(0,0,0,0.125); background: rgba(0,0,0,0.0625); }
+</style>
+<script>
+function notify() {
+  url = document.querySelector('#url').value
+  fetch("/notify", {
+    method: "POST",
+    headers: {"Content-Type":"text/plain"},
+    body: url,
+  }).then(resp => resp.text())
+    .then(txt => document.querySelector('pre').append(txt+'\n\n'))
+    .catch(error => document.querySelector('pre').append(txt+'\n\n'))
+  return false
+}
+</script>
+
+  <script>
+function drawCell(num,dx,dy) {
+  if (!num) return
+  c.beginPath()
+  if (num&1) { // west
+    c.moveTo((dx-0.45),(dy-0.45))
+    c.lineTo((dx-0.45),(dy+0.45))
+  }
+  if (num&2) { // south
+    c.moveTo((dx-0.45),(dy+0.45))
+    c.lineTo((dx+0.45),(dy+0.45))
+  }
+  if (num&4) { // east
+    c.moveTo((dx+0.45),(dy-0.45))
+    c.lineTo((dx+0.45),(dy+0.45))
+  }
+  if (num&8) { // north
+    c.moveTo((dx-0.45),(dy-0.45))
+    c.lineTo((dx+0.45),(dy-0.45))
+  }
+  c.stroke()
+}
+
+function drawTile(arr) {
+  if (!Array.isArray(arr)) throw Error("Mazes tiles need to be lists, not "+typeof arr);
+  if (!arr.length == 7) throw Error("Mazes tiles need to have 7 rows, but "+arr.length+" supplied");
+  for(let row of arr) {
+    if ('string' != typeof row) throw Error("Mazes rows need to be strings, not "+typeof row);
+    if (row.length != 7) throw Error("Mazes rows need to have 7 cells, but "+JSON.stringify(row)+" has "+row.length);
+    if (!/^[0-9a-fA0-F]*$/.test(row)) throw Error("Mazes cells need to be hexadecimal digits, not "+JSON.stringify(row));
+  }
+  c.clearRect(-canvas.width/2,-canvas.height/2,canvas.width,canvas.height)
+  for(let y = 0; y  < 7; y += 1) for(let x = 0; x < 7; x += 1) {
+    num = Number.parseInt(arr[y][x], 16);
+    drawCell(num, x-3, y-3);
+  }
+}
+
+function setBorder(c) {
+  canvas.style.border = 'none';
+  
+  if (c[0] == '/') {
+    try {
+      const num = Number.parseInt(c[1],16);
+      if (num & 1) canvas.style.borderLeft = '10px solid grey'
+      if (num & 2) canvas.style.borderBottom = '10px solid grey'
+      if (num & 4) canvas.style.borderRight = '10px solid grey'
+      if (num & 8) canvas.style.borderTop = '10px solid grey'
+    } catch { }
+  }
+}
+
+async function visualize() {
+  const value = document.getElementById('tile').value.trim()
+  if (value.length == 0) return
+  try {
+    if (value[0] == '[') {
+      drawTile(JSON.parse(value))
+      setBorder('/0')
+    } else {
+      const res = await fetch(value)
+      const arr = await res.json()
+      console.debug(value,"returned", arr)
+      drawTile(arr)
+      setBorder(value.substr(-2))
+    }
+  } catch (ex) {
+    console.error(ex)
+    alert(ex)
+  }
+  console.debug(value)
+  return false;
+}
+
+window.addEventListener('load', event => {
+  window.canvas = document.querySelector('canvas')
+  const scale = Math.min(window.canvas.width,window.canvas.height)/7
+  window.c = window.canvas.getContext('2d')
+  window.c.lineCap = 'square'
+  window.c.lineWidth = 1/16
+  window.c.setTransform(100,0, 0,100, window.canvas.width/2, window.canvas.height/2)
+  drawTile(["98a0a8c","1494b04","1430e14","0280820","1e575d5","1e1c575","3a202a6"])
+})
+  </script>
+
+</head>
+<body style="background:white; color:black;">
+<p>This maze server believes it's base URL is <code>UNKNOWN</code></p>
+<form onsubmit="return notify()"><label>Middleware server URL: <input id="url" type="text"></label> <input type="submit"value="Tell that server that I exist"></form>
+<pre id="log"></pre>
+
+<div>Tile Visualization:
+<form onsubmit="visualize(); return false"><label>URL or JSON tile:<input type="text" id="tile" value='["98a0a8c","1494b04","1430e14","0280820","1e575d5","1e1c575","3a202a6"]' size="71" style="max-width:100%"></label><input type="submit" value="Visualize tile"></form>
+<canvas width="700" height="700" style="max-width: 100%; border: thin solid orange;"></canvas>
+<p>(Suggestion: try <code>/static</code>, and also <code>/dynamic/0</code>, <code>dynamic/1</code>, ..., <code>/dynamic/F</code>)</p>
+</div>
+</body>
+</html>
